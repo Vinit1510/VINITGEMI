@@ -42,26 +42,61 @@ function nowIST() {
   };
 }
 
+const PROXIES = [
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://thingproxy.freeboard.io/fetch/${url}`
+];
+
+async function fetchWithProxy(targetUrl, headers, timeout = 8000) {
+  // Try direct first
+  try {
+    const res = await fetch(targetUrl, { headers, signal: AbortSignal.timeout(timeout) });
+    if (res.ok) return res;
+    console.log(`[PROXY] Direct fetch returned status ${res.status}. Trying proxy pool...`);
+  } catch (e) {
+    console.log(`[PROXY] Direct fetch failed: ${e.message}. Trying proxy pool...`);
+  }
+
+  // Try proxies one by one
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const proxyUrl = PROXIES[i](targetUrl);
+      console.log(`[PROXY] Trying proxy option ${i + 1}...`);
+      const res = await fetch(proxyUrl, { headers, signal: AbortSignal.timeout(timeout) });
+      if (res.ok) {
+        console.log(`[PROXY] Proxy option ${i + 1} succeeded!`);
+        return res;
+      }
+      console.log(`[PROXY] Proxy option ${i + 1} returned status ${res.status}`);
+    } catch (e) {
+      console.log(`[PROXY] Proxy option ${i + 1} failed: ${e.message}`);
+    }
+  }
+  throw new Error("All proxies and direct fetches failed with 403 or connection errors.");
+}
+
 async function mineLoop(gameType) {
   try {
-    console.log(`[${gameType}] Fetching lottery data via Proxy...`);
-    const targetUrl = `${ENDPOINTS[gameType]}?ts=${Date.now()}`;
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(proxyUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(8000) });
+    console.log(`[${gameType}] Fetching lottery data via Old Project API...`);
+    const res = await fetch(`https://vinit-enxj.onrender.com/api/stats?game=${gameType}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
-      console.log(`[${gameType}] HTTP Error: ${res.status} ${res.statusText}`);
+      console.log(`[${gameType}] Old API returned status ${res.status}`);
       return;
     }
     const json = await res.json();
-    const history = json.data.list;
-    if (!history || history.length < 3) {
-      console.log(`[${gameType}] No valid history data received.`);
+    const recentList = json.recent;
+    if (!recentList || recentList.length === 0) {
+      console.log(`[${gameType}] No valid recent data from Old API.`);
       return;
     }
 
     const gs = state[gameType];
-    const latest = history[0];
-    console.log(`[${gameType}] Latest Period ID on API: ${latest.issueNumber}`);
+    const latest = {
+      issueNumber: recentList[0].periodId,
+      number: String(recentList[0].actualNum)
+    };
+    console.log(`[${gameType}] Latest Period ID from Old API: ${latest.issueNumber}`);
 
     if (gs.lastId === latest.issueNumber) {
       console.log(`[${gameType}] Period ${latest.issueNumber} already processed. Skipping.`);
