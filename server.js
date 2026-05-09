@@ -178,8 +178,18 @@ async function mineLoop(gameType) {
           responseText = response.text();
         }
 
-        const rawText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(rawText);
+        let parsed = {};
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+          } catch (jsonErr) {
+            console.error("[JSON PARSE ERROR] Failed to parse extracted regex JSON. Trying fallback cleanup...", jsonErr.message);
+            parsed = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, '').trim());
+          }
+        } else {
+          parsed = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, '').trim());
+        }
         
         // Enforce strict mathematical constraints to prevent LLM hallucinations (e.g., number 23, color BLACK)
         let num = parseInt(parsed.number);
