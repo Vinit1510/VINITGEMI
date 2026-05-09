@@ -162,7 +162,7 @@ async function mineLoop(gameType) {
       `;
 
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
         const result = await model.generateContent(aiPrompt);
         const response = await result.response;
         const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
@@ -221,6 +221,20 @@ app.get("/api/stats", async (req, res) => {
 
 async function start() {
   await initDB();
+  
+  // Self-Diagnostic: Automatically list all available models for your specific API key in the logs on startup
+  try {
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`);
+    if (listRes.ok) {
+      const listJson = await listRes.json();
+      console.log("[GEMINI DIAGNOSTIC] Available Models on your API key:", listJson.models.map(m => m.name.replace("models/", "")));
+    } else {
+      console.log("[GEMINI DIAGNOSTIC] Failed to list models. Status:", listRes.status);
+    }
+  } catch (e) {
+    console.log("[GEMINI DIAGNOSTIC] Could not list models on startup:", e.message);
+  }
+
   app.listen(PORT, () => {
     console.log(`\n╔══════════════════════════════════════════╗`);
     console.log(`║   VINIGEMI 1M ONLY — FREE TIER MODE      ║`);
