@@ -162,10 +162,23 @@ async function mineLoop(gameType) {
       `;
 
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-        const result = await model.generateContent(aiPrompt);
-        const response = await result.response;
-        const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        let responseText = "";
+        try {
+          // Attempt 1: Call the 100% Unlimited Gemini 3 Flash Live model
+          const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-live-preview" });
+          const result = await model.generateContent(aiPrompt);
+          const response = await result.response;
+          responseText = response.text();
+        } catch (liveErr) {
+          console.log("[GEMINI] Live model not supported for REST or limit hit. Falling back to Gemma 4 26B (1,500 RPD)...");
+          // Attempt 2: Fallback to the 1,500 RPD Gemma 4 26B model (covers 1,440 daily rounds completely for free)
+          const model = genAI.getGenerativeModel({ model: "gemma-4-26b-a4b-it" });
+          const result = await model.generateContent(aiPrompt);
+          const response = await result.response;
+          responseText = response.text();
+        }
+
+        const rawText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(rawText);
         
         // Enforce strict mathematical constraints to prevent LLM hallucinations (e.g., number 23, color BLACK)
