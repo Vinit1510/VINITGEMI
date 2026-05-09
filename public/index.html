@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VINIGEMI Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: white; margin: 0; padding: 20px; }
+    .header { text-align: center; margin-bottom: 30px; }
+    h1 { background: linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip: text; color: transparent; font-size: 36px; margin: 0; }
+    .card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; text-align: center; }
+    .big-text { font-size: 48px; font-weight: 800; margin: 10px 0; }
+    .win { color: #4ade80; font-weight: bold; }
+    .loss { color: #f87171; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+    th { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>VINIGEMI NEURAL BRAIN</h1>
+    <p>Powered by Google Gemini Flash</p>
+  </div>
+
+  <div class="card" id="predCard">
+    <h3 style="color:#94a3b8; margin-top:0;">Target Period: <span id="targetId">Wait...</span></h3>
+    <div class="big-text" id="targetNum">?</div>
+    <div>Size: <strong id="targetSize">-</strong> | Color: <strong id="targetColor">-</strong></div>
+    <div style="margin-top:15px; color:#c084fc;" id="targetMethod">Mining first block...</div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0; text-align:left;">Recent Results</h3>
+    <table id="historyTable">
+      <tr><th>Period</th><th>Actual</th><th>Predicted</th><th>Strategy</th><th>Result</th></tr>
+    </table>
+  </div>
+
+  <script>
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/stats?game=1M");
+        const d = await res.json();
+        
+        if (d.prediction) {
+          document.getElementById("targetId").innerText = d.prediction.targetId;
+          document.getElementById("targetNum").innerText = d.prediction.number;
+          document.getElementById("targetSize").innerText = d.prediction.size;
+          document.getElementById("targetColor").innerText = d.prediction.color;
+          document.getElementById("targetMethod").innerText = `${d.prediction.method} (${d.prediction.confidence}%)`;
+        }
+
+        if (d.recent && d.recent.length > 0) {
+          document.getElementById("historyTable").innerHTML = `
+            <tr><th>Period</th><th>Actual</th><th>Predicted</th><th>Strategy</th><th>Result</th></tr>
+            ${d.recent.map(r => `
+              <tr>
+                <td>${String(r.periodId).slice(-6)}</td>
+                <td>${r.actualNum} (${r.actualSize})</td>
+                <td>${r.predNum} (${r.predSize})</td>
+                <td style="font-size:12px; color:#94a3b8;">${r.pattern}</td>
+                <td class="${r.sizeWin === 'WIN' ? 'win' : 'loss'}">${r.sizeWin}</td>
+              </tr>
+            `).join('')}
+          `;
+        }
+      } catch (e) { console.error(e); }
+    }
+    fetchStats();
+    setInterval(fetchStats, 5000);
+  </script>
+</body>
+</html>
