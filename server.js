@@ -36,16 +36,27 @@ function nowIST() {
 
 async function mineLoop(gameType) {
   try {
+    console.log(`[${gameType}] Fetching lottery data...`);
     const res = await fetch(`${ENDPOINTS[gameType]}?ts=${Date.now()}`, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return;
+    if (!res.ok) {
+      console.log(`[${gameType}] HTTP Error: ${res.status} ${res.statusText}`);
+      return;
+    }
     const json = await res.json();
     const history = json.data.list;
-    if (!history || history.length < 3) return;
+    if (!history || history.length < 3) {
+      console.log(`[${gameType}] No valid history data received.`);
+      return;
+    }
 
     const gs = state[gameType];
     const latest = history[0];
+    console.log(`[${gameType}] Latest Period ID on API: ${latest.issueNumber}`);
 
-    if (gs.lastId === latest.issueNumber) return;
+    if (gs.lastId === latest.issueNumber) {
+      console.log(`[${gameType}] Period ${latest.issueNumber} already processed. Skipping.`);
+      return;
+    }
     gs.lastId = latest.issueNumber;
 
     // 1. Process previous prediction
@@ -70,12 +81,15 @@ async function mineLoop(gameType) {
 
     // 2. Build Context & Call Gemini for next round
     const nextId = String(BigInt(latest.issueNumber) + 1n);
+    console.log(`[${gameType}] Preparing prediction for next Period: ${nextId}`);
     const context = await getEngineContext(gameType);
     let final;
 
     if (!context) {
+       console.log(`[${gameType}] No DB context found yet. Starting in INITIALIZING mode.`);
        final = { number: 5, size: "BIG", color: "GREEN", confidence: 50, method: "INITIALIZING" };
     } else {
+       console.log(`[${gameType}] DB context generated successfully. Calling Gemini API...`);
       const aiPrompt = `
       You are the VINIGEMI Master Algorithmic Analyst. Analyze this sequence of recent casino results (oldest to newest):
       Numbers: ${context.recentNums}
@@ -102,6 +116,7 @@ async function mineLoop(gameType) {
         const response = await result.response;
         const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         final = JSON.parse(rawText);
+        console.log(`[${gameType}] Gemini API prediction successful: ${rawText}`);
       } catch (e) {
         console.error(`[GEMINI ERROR]:`, e.message);
         final = { number: 5, size: "BIG", color: "GREEN", confidence: 10, method: "API_FALLBACK" };
@@ -109,6 +124,7 @@ async function mineLoop(gameType) {
     }
 
     gs.lastPred = { n: final.number, sz: final.size, col: final.color, method: final.method, confidence: final.confidence, targetId: nextId };
+    console.log(`[${gameType}] Active prediction updated: Period ${nextId} | Predicted: ${final.number} (${final.size})`);
 
   } catch (err) {
     console.error(`[${gameType}] Mining Error:`, err.message);
