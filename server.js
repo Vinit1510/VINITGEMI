@@ -44,8 +44,10 @@ function nowIST() {
 
 async function mineLoop(gameType) {
   try {
-    console.log(`[${gameType}] Fetching lottery data...`);
-    const res = await fetch(`${ENDPOINTS[gameType]}?ts=${Date.now()}`, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(8000) });
+    console.log(`[${gameType}] Fetching lottery data via Proxy...`);
+    const targetUrl = `${ENDPOINTS[gameType]}?ts=${Date.now()}`;
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    const res = await fetch(proxyUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       console.log(`[${gameType}] HTTP Error: ${res.status} ${res.statusText}`);
       return;
