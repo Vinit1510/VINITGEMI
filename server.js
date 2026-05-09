@@ -142,6 +142,15 @@ async function mineLoop(gameType) {
       Current BIG Ratio (Last 10): ${context.bigRatio}
       Current Streak: ${context.streakLength} ${context.currentStreakDirection}
       
+      CRITICAL GAME RULES (You MUST strictly follow these):
+      - The predicted "number" MUST strictly be a single integer from 0 to 9.
+      - The predicted "size" MUST strictly be "BIG" (for numbers 5, 6, 7, 8, 9) or "SMALL" (for numbers 0, 1, 2, 3, 4).
+      - The predicted "color" MUST strictly be based on your predicted number:
+        * If number is 0, color is "RED_VIOLET"
+        * If number is 5, color is "GREEN_VIOLET"
+        * If number is 1, 3, 7, 9, color is "GREEN"
+        * If number is 2, 4, 6, 8, color is "RED"
+      
       Apply the dynamic state machine logic:
       - If ratio <= 0.3 or >= 0.7, trigger EMERGENCY_REVERSAL.
       - If streak >= 3, trigger CLUSTER_MOMENTUM.
@@ -154,17 +163,30 @@ async function mineLoop(gameType) {
 
       try {
         const model = genAI.getGenerativeModel({ 
-          model: "gemini-2.5-flash",
+          model: "gemini-1.5-flash",
           generationConfig: { temperature: 0.1 }
         });
         const result = await model.generateContent(aiPrompt);
         const response = await result.response;
         const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        final = JSON.parse(rawText);
-        console.log(`[${gameType}] Gemini API prediction successful: ${rawText}`);
+        const parsed = JSON.parse(rawText);
+        
+        // Enforce strict mathematical constraints to prevent LLM hallucinations (e.g., number 23, color BLACK)
+        let num = parseInt(parsed.number);
+        if (isNaN(num) || num < 0 || num > 9) {
+          num = 5; // Safe default
+        }
+        final = {
+          number: num,
+          size: num >= 5 ? "BIG" : "SMALL",
+          color: getColor(num),
+          confidence: Math.max(10, Math.min(99, parseInt(parsed.confidence) || 80)),
+          method: parsed.method || "GEMINI[TREND_RIDING]"
+        };
+        console.log(`[${gameType}] Gemini API prediction parsed and strictly validated:`, final);
       } catch (e) {
         console.error(`[GEMINI ERROR]:`, e.message);
-        final = { number: 5, size: "BIG", color: "GREEN", confidence: 10, method: "API_FALLBACK" };
+        final = { number: 5, size: "BIG", color: "GREEN_VIOLET", confidence: 10, method: "API_FALLBACK" };
       }
     }
 
@@ -205,11 +227,28 @@ async function start() {
     console.log(`║   VINIGEMI 1M ONLY — FREE TIER MODE      ║`);
     console.log(`╚══════════════════════════════════════════╝\n`);
 
-    // Only start the 1M mining loop
-    mineLoop("1M");
-    setInterval(() => mineLoop("1M"), 9000); 
-
-    // 30S Loop is removed to protect the 1,500/day API quota
+    // Precise 60S Aligned Scheduler to run exactly at the 03s mark of every minute
+    function scheduleNextMine() {
+      const now = new Date();
+      const seconds = now.getSeconds();
+      
+      let delay = (60 - seconds + 3) * 1000;
+      if (seconds < 3) {
+        delay = (3 - seconds) * 1000;
+      }
+      
+      setTimeout(async () => {
+        try {
+          await mineLoop("1M");
+        } catch (e) {
+          console.error("[SCHEDULER ERROR]:", e.message);
+        }
+        scheduleNextMine();
+      }, delay);
+    }
+    
+    // Start the precise scheduler
+    scheduleNextMine();
   });
 }
 start();
