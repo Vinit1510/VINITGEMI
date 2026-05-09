@@ -262,6 +262,17 @@ app.get("/api/stats", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post("/api/force-mine", async (req, res) => {
+  try {
+    console.log("[MANUAL TRIGGER] Forcing new prediction block check...");
+    // Force call mineLoop
+    const success = await mineLoop("1M");
+    res.json({ success, message: success ? "AI Prediction block successfully mined!" : "Skip: No new period available on Old API yet." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 async function start() {
   await initDB();
   
@@ -305,9 +316,9 @@ async function start() {
           // If successfully mined, schedule next for the 03s mark of the next minute
           scheduleNextMine();
         } else {
-          // If skipped/delayed, back off and retry in exactly 15 seconds to avoid API spamming
-          console.log(`[${new Date().toLocaleTimeString()}] [SCHEDULER] Cooldown active. Retrying in 15 seconds...`);
-          setTimeout(scheduleNextMine, 15000);
+          // If skipped/delayed, back off and retry in exactly 4 seconds to catch the new period instantly
+          console.log(`[${new Date().toLocaleTimeString()}] [SCHEDULER] Cooldown active. Retrying in 4 seconds...`);
+          setTimeout(scheduleNextMine, 4000);
         }
       }, delay);
     }
