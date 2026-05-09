@@ -9,7 +9,7 @@ function getColor(n) {
 
 async function getEngineContext(gameType) {
   const res = await pool.query(
-    `SELECT actual_num, actual_size, actual_color 
+    `SELECT period_id, actual_num, actual_size, actual_color 
      FROM predictions WHERE game_type = $1 AND actual_size IS NOT NULL
      ORDER BY id DESC LIMIT 20`,
     [gameType]
@@ -35,12 +35,22 @@ async function getEngineContext(gameType) {
   const bigCount = sizes10.filter(s => s === "BIG").length;
   const ratio = sizes10.length > 0 ? bigCount / sizes10.length : 0.5;
 
+  // Format exactly like the raw list provided by the user
+  const rawList = res.rows.slice(0, 10).map(r => ({
+    issueNumber: r.period_id || "",
+    number: String(r.actual_num),
+    color: (r.actual_color || "").toLowerCase().replace("_", ","),
+    premium: String(r.actual_num),
+    sum: 0
+  }));
+
   return {
     recentNums: nums.slice(0, 10).reverse().join(", "), // Oldest to newest
     recentSizes: sizes.slice(0, 10).reverse().join(", "),
     streakLength: streakLen,
     currentStreakDirection: firstSize,
-    bigRatio: ratio
+    bigRatio: ratio,
+    rawListJSON: JSON.stringify({ data: { list: rawList } }, null, 2)
   };
 }
 
