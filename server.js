@@ -82,13 +82,13 @@ async function mineLoop(gameType) {
     const res = await fetch(`https://vinit-enxj.onrender.com/api/stats?game=${gameType}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       console.log(`[${gameType}] Old API returned status ${res.status}`);
-      return;
+      return false;
     }
     const json = await res.json();
     const recentList = json.recent;
     if (!recentList || recentList.length === 0) {
       console.log(`[${gameType}] No valid recent data from Old API.`);
-      return;
+      return false;
     }
 
     const gs = state[gameType];
@@ -100,7 +100,7 @@ async function mineLoop(gameType) {
 
     if (gs.lastId === latest.issueNumber) {
       console.log(`[${gameType}] Period ${latest.issueNumber} already processed. Skipping.`);
-      return;
+      return false;
     }
     gs.lastId = latest.issueNumber;
 
@@ -163,7 +163,7 @@ async function mineLoop(gameType) {
 
       try {
         const model = genAI.getGenerativeModel({ 
-          model: "gemini-1.5-flash",
+          model: "models/gemini-1.5-flash",
           generationConfig: { temperature: 0.1 }
         });
         const result = await model.generateContent(aiPrompt);
@@ -192,9 +192,11 @@ async function mineLoop(gameType) {
 
     gs.lastPred = { n: final.number, sz: final.size, col: final.color, method: final.method, confidence: final.confidence, targetId: nextId };
     console.log(`[${gameType}] Active prediction updated: Period ${nextId} | Predicted: ${final.number} (${final.size})`);
+    return true;
 
   } catch (err) {
     console.error(`[${gameType}] Mining Error:`, err.message);
+    return false;
   }
 }
 
@@ -227,7 +229,7 @@ async function start() {
     console.log(`║   VINIGEMI 1M ONLY — FREE TIER MODE      ║`);
     console.log(`╚══════════════════════════════════════════╝\n`);
 
-    // Precise 60S Aligned Scheduler to run exactly at the 03s mark of every minute
+    // Precise 60S Aligned Scheduler with automated retry backup
     function scheduleNextMine() {
       const now = new Date();
       const seconds = now.getSeconds();
@@ -238,12 +240,21 @@ async function start() {
       }
       
       setTimeout(async () => {
+        let success = false;
         try {
-          await mineLoop("1M");
+          success = await mineLoop("1M");
         } catch (e) {
           console.error("[SCHEDULER ERROR]:", e.message);
         }
-        scheduleNextMine();
+        
+        if (success) {
+          // If successfully mined, schedule next for the 03s mark of the next minute
+          scheduleNextMine();
+        } else {
+          // If skipped/delayed, back off and retry in exactly 15 seconds to avoid API spamming
+          console.log(`[${new Date().toLocaleTimeString()}] [SCHEDULER] Cooldown active. Retrying in 15 seconds...`);
+          setTimeout(scheduleNextMine, 15000);
+        }
       }, delay);
     }
     
