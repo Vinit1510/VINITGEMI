@@ -164,15 +164,15 @@ async function mineLoop(gameType) {
       try {
         let responseText = "";
         try {
-          // Attempt 1: Call the 100% Unlimited Gemini 3 Flash Live model
-          const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-live-preview" });
+          // Attempt 1: Call the stable production-ready Gemma 4 31B model (1,500 RPD quota - covers 1,440 daily rounds completely free)
+          const model = genAI.getGenerativeModel({ model: "gemma-4-31b-it" });
           const result = await model.generateContent(aiPrompt);
           const response = await result.response;
           responseText = response.text();
         } catch (liveErr) {
-          console.log("[GEMINI] Live model not supported for REST or limit hit. Falling back to Gemma 4 26B (1,500 RPD)...");
-          // Attempt 2: Fallback to the 1,500 RPD Gemma 4 26B model (covers 1,440 daily rounds completely for free)
-          const model = genAI.getGenerativeModel({ model: "gemma-4-26b-a4b-it" });
+          console.log("[GEMINI] Gemma 4 busy or limit hit. Falling back to Gemini 3.1 Flash Lite (500 RPD)...");
+          // Attempt 2: Fallback to the stable Gemini 3.1 Flash Lite model (500 RPD quota)
+          const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
           const result = await model.generateContent(aiPrompt);
           const response = await result.response;
           responseText = response.text();
