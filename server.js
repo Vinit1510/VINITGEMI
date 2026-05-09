@@ -10,7 +10,7 @@ const ai = new GoogleGenAI({});
 
 const state = {
   "1M": { lastPred: null, lastId: null },
-  "30S": { lastPred: null, lastId: null },
+  // "30S": { lastPred: null, lastId: null }, // DISABLED TO SAVE API LIMITS
 };
 
 const ENDPOINTS = {
@@ -140,12 +140,14 @@ async function start() {
   await initDB();
   app.listen(PORT, () => {
     console.log(`\n╔══════════════════════════════════════════╗`);
-    console.log(`║   VINIGEMI NEURAL ENGINE ACTIVE          ║`);
+    console.log(`║   VINIGEMI 1M ONLY — FREE TIER MODE      ║`);
     console.log(`╚══════════════════════════════════════════╝\n`);
+
+    // Only start the 1M mining loop
     mineLoop("1M");
-    mineLoop("30S");
-    setInterval(() => mineLoop("1M"), 9000);
-    setInterval(() => mineLoop("30S"), 9000);
+    setInterval(() => mineLoop("1M"), 9000); 
+
+    // 30S Loop is removed to protect the 1,500/day API quota
   });
 }
 start();
