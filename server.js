@@ -162,10 +162,7 @@ async function mineLoop(gameType) {
       `;
 
       try {
-        const model = genAI.getGenerativeModel({ 
-          model: "models/gemini-1.5-flash",
-          generationConfig: { temperature: 0.1 }
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent(aiPrompt);
         const response = await result.response;
         const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
