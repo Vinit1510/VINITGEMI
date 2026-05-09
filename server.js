@@ -136,11 +136,12 @@ async function mineLoop(gameType) {
     } else {
        console.log(`[${gameType}] DB context generated successfully. Calling Gemini API...`);
       const aiPrompt = `
-      You are the VINIGEMI Master Algorithmic Analyst. Analyze this sequence of recent casino results (oldest to newest):
-      Numbers: ${context.recentNums}
-      Sizes: ${context.recentSizes}
-      Current BIG Ratio (Last 10): ${context.bigRatio}
-      Current Streak: ${context.streakLength} ${context.currentStreakDirection}
+      You are the VINIGEMI Master Algorithmic Analyst. Analyze this raw JSON data of recent casino results (newest to oldest):
+      ${context.rawListJSON}
+      
+      Summary Context:
+      - Current BIG Ratio (Last 10): ${context.bigRatio}
+      - Current Streak: ${context.streakLength} ${context.currentStreakDirection}
       
       CRITICAL GAME RULES (You MUST strictly follow these):
       - The predicted "number" MUST strictly be a single integer from 0 to 9.
@@ -190,11 +191,24 @@ async function mineLoop(gameType) {
           try {
             parsed = JSON.parse(jsonMatch[0]);
           } catch (jsonErr) {
-            console.error("[JSON PARSE ERROR] Failed to parse extracted regex JSON. Trying fallback cleanup...", jsonErr.message);
-            parsed = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, '').trim());
+            console.warn("[JSON PARSE ERROR] Malformed JSON detected. Running robust regex key-value extractor fallback...");
+            const numMatch = responseText.match(/"number"\s*:\s*(\d+)/) || responseText.match(/number\s*:\s*(\d+)/);
+            const confMatch = responseText.match(/"confidence"\s*:\s*(\d+)/) || responseText.match(/confidence\s*:\s*(\d+)/);
+            const methodMatch = responseText.match(/"method"\s*:\s*"([^"]+)"/) || responseText.match(/method\s*:\s*"([^"]+)"/);
+            parsed = {
+              number: numMatch ? parseInt(numMatch[1]) : 5,
+              confidence: confMatch ? parseInt(confMatch[1]) : 80,
+              method: methodMatch ? methodMatch[1] : "GEMINI[FALLBACK_REGEX]"
+            };
           }
         } else {
-          parsed = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, '').trim());
+          const numMatch = responseText.match(/number\s*:\s*(\d+)/i) || responseText.match(/\b[0-9]\b/);
+          const confMatch = responseText.match(/confidence\s*:\s*(\d+)/i);
+          parsed = {
+            number: numMatch ? parseInt(numMatch[0].replace(/\D/g, '')) : 5,
+            confidence: confMatch ? parseInt(confMatch[1]) : 80,
+            method: "GEMINI[DIRECT_REGEX]"
+          };
         }
         
         // Enforce strict mathematical constraints to prevent LLM hallucinations (e.g., number 23, color BLACK)
