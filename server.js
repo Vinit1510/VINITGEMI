@@ -1,12 +1,12 @@
 require("dotenv").config();
 const express = require("express");
-const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { pool, initDB } = require("./core/db");
 const { getColor, getEngineContext } = require("./core/data_formatter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ai = new GoogleGenAI({}); 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); 
 
 const state = {
   "1M": { lastPred: null, lastId: null },
@@ -94,12 +94,13 @@ async function mineLoop(gameType) {
       `;
 
       try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: aiPrompt,
-          config: { temperature: 0.1 }
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-2.5-flash",
+          generationConfig: { temperature: 0.1 }
         });
-        const rawText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const result = await model.generateContent(aiPrompt);
+        const response = await result.response;
+        const rawText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         final = JSON.parse(rawText);
       } catch (e) {
         console.error(`[GEMINI ERROR]:`, e.message);
